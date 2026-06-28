@@ -11,6 +11,11 @@ git clone https://github.com/hbswcsyzx/ascend-sx.git
 cd ascend-sx
 rm -rf .git
 rm -rf README.md
+```
+
+在 `init.sh` 中填入 `ZIP_URL` 和 `PNG_URL` ，分别对应官网“赛题详情”页“点击下载”处的链接地址和下方的图片地址，之后便可启动 agent
+
+```sh
 codex "read AGENT.md and initialize structure"
 ```
 
