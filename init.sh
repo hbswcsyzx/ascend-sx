@@ -1,0 +1,242 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Fill these URLs before running in a fresh competition workspace.
+# If JUDGE.zip or TASK.png already exists beside this script, the matching
+# download is skipped.
+ZIP_URL=https://public-download.obs.cn-east-2.myhuaweicloud.com/%E7%AE%97%E5%AD%90%E6%8C%91%E6%88%98%E8%B5%9BS9/%E7%AE%97%E5%AD%90%E6%8C%91%E6%88%98%E8%B5%9BS9%E8%B5%9B%E9%A2%98.zip
+PNG_URL=https://www.hiascend.com/p/resource/202606/91664dd8748d4f059189eb36e7336b17.png
+
+JUDGE_ZIP="${SCRIPT_PATH}/JUDGE.zip"
+TASK_PNG="${SCRIPT_PATH}/TASK.png"
+TMP_DIR="${SCRIPT_PATH}/tmp"
+REPO_DIR="${SCRIPT_PATH}/repo"
+WORKTREES_DIR="${SCRIPT_PATH}/worktrees"
+
+download_if_missing() {
+    local url="$1"
+    local output="$2"
+    local label="$3"
+
+    if [[ -s "${output}" ]]; then
+        echo "[init] ${label} already exists: ${output}"
+        return
+    fi
+    if [[ -f "${output}" ]]; then
+        echo "[init] Removing empty or incomplete ${label}: ${output}"
+        rm -f "${output}"
+    fi
+    if [[ -z "${url}" || "${url}" == "TODO" ]]; then
+        echo "[init] Missing ${label}. Set the URL in init.sh or place ${output} manually." >&2
+        exit 1
+    fi
+
+    echo "[init] Downloading ${label}..."
+    local tmp_output
+    tmp_output="$(mktemp "${output}.download.XXXXXX")"
+    if ! wget -O "${tmp_output}" "${url}"; then
+        rm -f "${tmp_output}"
+        echo "[init] Failed to download ${label} from ${url}" >&2
+        exit 1
+    fi
+    if [[ ! -s "${tmp_output}" ]]; then
+        rm -f "${tmp_output}"
+        echo "[init] Downloaded ${label} is empty: ${url}" >&2
+        exit 1
+    fi
+    mv "${tmp_output}" "${output}"
+}
+
+copy_judge_files() {
+    local src="$1"
+    local dst="$2"
+
+    mkdir -p "${dst}/judge" "${dst}/release"
+    cp -a "${src}/." "${dst}/judge/"
+}
+
+write_pack_script() {
+    local dst="$1"
+
+    cat > "${dst}/pack.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OP_NAME="$(basename "${SCRIPT_PATH}")"
+
+mkdir -p "${SCRIPT_PATH}/release"
+rm -rf "${SCRIPT_PATH}/${OP_NAME}/build_out"
+cd "${SCRIPT_PATH}"
+zip -r "release/${OP_NAME}_$(date +%Y%m%d_%H%M).zip" "./${OP_NAME}"
+EOF
+    chmod +x "${dst}/pack.sh"
+}
+
+write_gitignore() {
+    local dst="$1"
+
+    cat > "${dst}/.gitignore" <<'EOF'
+# Build
+**/build/
+**/build_out/
+**/.local_opp/
+**/dist/
+**/cmake-build-*/
+*.o
+*.a
+*.so
+
+# Clangd
+.cache/
+
+# Python
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+*.whl
+
+# Logs and profiling
+*.log
+*.dump
+PROF*/
+OPPROF*/
+extra-info/
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+EOF
+}
+
+write_task_stub() {
+    local op="$1"
+    local dst="$2"
+
+    mkdir -p "${dst}/docs"
+    if [[ -f "${dst}/docs/TASK.md" ]]; then
+        return
+    fi
+
+    cat > "${dst}/docs/TASK.md" <<EOF
+# ${op} Specification
+
+> Workspace: \`repo/${op}/\`
+> Judge files: \`repo/${op}/judge/\`
+> Fill this document from top-level \`TASK.png\` and \`tmp/*.xlsx\`. If the interface specification conflicts with the judge files, use the judge files as the source of truth and update related files when needed.
+
+## 1. Task Definition
+
+- Reference operator: TODO
+- Reference behavior:
+
+\`\`\`python
+TODO
+\`\`\`
+
+## 2. Interface Specification
+
+### 2.1 Parameters
+
+| Kind | Name | Type | DType(s) | Format | Required | Default |
+| --- | --- | --- | --- | --- | --- | --- |
+| INPUT | TODO | TODO | TODO | TODO | yes | - |
+| ATTR | TODO | TODO | - | - | TODO | TODO |
+| OUTPUT | TODO | TODO | TODO | TODO | yes | - |
+
+### 2.2 Semantics
+
+- TODO
+
+### 2.3 Shape Rules
+
+- TODO
+
+### 2.4 Edge Cases
+
+- TODO
+
+### 2.5 Judge Compatibility
+
+- TODO
+
+### 2.6 Open Questions
+
+- TODO
+
+## 3. Development Workflow
+
+1. Complete \`${op}.json\` from the task document without changing the existing \`op\` field.
+2. Run \`msopgen gen -i ${op}.json -f tf -c ai_core-ascend910b -lan cpp -out ${op}\` from this directory.
+3. Expand \`judge/test_op.py\` with deterministic correctness cases before optimizing performance.
+4. Implement and optimize the Ascend C operator. Use profiling data before making performance changes.
+
+## 4. Notes
+
+1. Install the generated operator into the local \`.local_opp\` directory when testing.
+2. Select an idle NPU before running performance or correctness tests.
+EOF
+}
+
+write_json_stub() {
+    local op="$1"
+    local dst="$2"
+
+    if [[ -f "${dst}/${op}.json" ]]; then
+        return
+    fi
+
+    cat > "${dst}/${op}.json" <<EOF
+[
+    {
+        "op": "${op}"
+    }
+]
+EOF
+}
+
+download_if_missing "${ZIP_URL}" "${JUDGE_ZIP}" "judge archive"
+download_if_missing "${PNG_URL}" "${TASK_PNG}" "task image"
+
+echo "[init] Extracting judge archive to top-level tmp/..."
+rm -rf "${TMP_DIR}"
+mkdir -p "${TMP_DIR}"
+UNZIP_DIR="$(mktemp -d)"
+trap 'rm -rf "${UNZIP_DIR}"' EXIT
+unzip -q "${JUDGE_ZIP}" -d "${UNZIP_DIR}"
+
+ROOT_DIR="$(find "${UNZIP_DIR}" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+if [[ -z "${ROOT_DIR}" ]]; then
+    echo "[init] Could not find the extracted root directory in ${JUDGE_ZIP}." >&2
+    exit 1
+fi
+cp -a "${ROOT_DIR}/." "${TMP_DIR}/"
+
+CASE_DIR="${TMP_DIR}/case_910b"
+if [[ ! -d "${CASE_DIR}" ]]; then
+    echo "[init] Missing expected judge directory: tmp/case_910b" >&2
+    exit 1
+fi
+
+mkdir -p "${REPO_DIR}" "${WORKTREES_DIR}"
+
+echo "[init] Creating operator workspaces under repo/..."
+shopt -s nullglob
+for judge_dir in "${CASE_DIR}"/*; do
+    [[ -d "${judge_dir}" ]] || continue
+    op="$(basename "${judge_dir}")"
+    op_dir="${REPO_DIR}/${op}"
+
+    mkdir -p "${op_dir}"
+    copy_judge_files "${judge_dir}" "${op_dir}"
+    write_pack_script "${op_dir}"
+    write_gitignore "${op_dir}"
+    write_task_stub "${op}" "${op_dir}"
+    write_json_stub "${op}" "${op_dir}"
+    echo "[init] Prepared repo/${op}"
+done
+
+echo "[init] Done."
