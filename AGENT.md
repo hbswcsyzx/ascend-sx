@@ -86,7 +86,38 @@ For every operator directory discovered from `tmp/case_910b/`, work under `repo/
 
 Open `repo/<OpName>/AGENT.md`. It should describe the current operator scope, required first reads, skill usage rules, source-of-truth rules, development workflow, and guardrails.
 
-Keep it generic enough to work in the later worktree checkout, where the path is usually `worktrees/<OpName>/<OpName>/`. It should mention `AGENT_SKILLS_HOME`, `ASC_DEVKIT_HOME`, `agent-skills-local`, `asc-devkit-local`, and matching `@ops-registry-invoke` / CANNBot skills. Do not hard-code absolute local paths.
+Keep it generic enough to work in the later worktree checkout: Codex usually starts at `worktrees/<OpName>/`, and the per-operator file is `worktrees/<OpName>/<OpName>/AGENT.md`. It should mention `AGENT_SKILLS_HOME`, `ASC_DEVKIT_HOME`, `agent-skills-local`, `asc-devkit-local`, and matching `@ops-registry-invoke` / CANNBot skills. Do not hard-code absolute local paths.
+
+It must also include a local build/test section with this path rule: future agents may start at `worktrees/<OpName>/`, must enter the operator root with `cd <OpName>`, and then run all commands relative to that operator root. The generated project is `./<OpName>/`; `judge/` is its sibling. Local state must be `<OpName>/.home/`, `<OpName>/.local_opp/`, and `judge/.python_ops/`; never use operator-root `.local_opp/`.
+
+The section must hard-code these commands, with `<OpName>` replaced by the real operator name and device `3` kept:
+
+```bash
+cd <OpName>
+ASCEND_RT_VISIBLE_DEVICES=3 bash build.sh
+cd ..
+```
+
+```bash
+cd <OpName>/build_out
+HOME=../.home \
+ASCEND_RT_VISIBLE_DEVICES=3 \
+./custom_opp_openEuler_aarch64.run --quiet \
+--install-path=../.local_opp
+cd ../..
+```
+
+```bash
+cd judge
+source ../<OpName>/.local_opp/vendors/customize/bin/set_env.bash
+python3 -m pip install --target "$PWD/.python_ops" --force-reinstall dist/*.whl
+ASCEND_RT_VISIBLE_DEVICES=3 \
+PYTHONPATH="$PWD/.python_ops:$PYTHONPATH" \
+msprof --application="python3 test_op.py 1"
+cd ..
+```
+
+It must also say later test runs only need to source the local OPP environment and run `msprof` with `PYTHONPATH="$PWD/.python_ops:$PYTHONPATH"` from `judge/`. `pack.sh` zips only `./<OpName>`, so it should only delete `<OpName>/build_out`, `<OpName>/.home`, and `<OpName>/.local_opp`, not anything under `judge/`.
 
 ### 1. Complete `docs/TASK.md`
 

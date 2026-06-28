@@ -69,6 +69,8 @@ OP_NAME="$(basename "${SCRIPT_PATH}")"
 
 mkdir -p "${SCRIPT_PATH}/release"
 rm -rf "${SCRIPT_PATH}/${OP_NAME}/build_out"
+rm -rf "${SCRIPT_PATH}/${OP_NAME}/.home"
+rm -rf "${SCRIPT_PATH}/${OP_NAME}/.local_opp"
 cd "${SCRIPT_PATH}"
 zip -r "release/${OP_NAME}_$(date +%Y%m%d_%H%M).zip" "./${OP_NAME}"
 EOF
@@ -82,7 +84,9 @@ write_gitignore() {
 # Build
 **/build/
 **/build_out/
+**/.home/
 **/.local_opp/
+**/.python_ops/
 **/dist/
 **/cmake-build-*/
 *.o
@@ -176,7 +180,7 @@ TODO
 
 ## 4. Notes
 
-1. Install the generated operator into the local \`.local_opp\` directory when testing.
+1. Install the generated operator into the generated project's local \`.local_opp\` directory when testing.
 2. Select an idle NPU before running performance or correctness tests.
 EOF
 }
@@ -192,7 +196,29 @@ write_operator_agent() {
     cat > "${dst}/AGENT.md" <<EOF
 # ${op} Development Agent
 
-You are developing only the \`${op}\` operator. In a worktree, your working directory is usually \`worktrees/${op}/${op}/\`. Do not modify other operators unless the user explicitly asks.
+You are developing only the \`${op}\` operator. Codex may start in \`worktrees/${op}/\`; this file lives at \`${op}/AGENT.md\`.
+
+## Path Basis
+
+Before using the paths or commands in this file, enter the operator root:
+
+\`\`\`bash
+cd ${op}
+\`\`\`
+
+All following paths are relative to the operator root:
+
+\`\`\`text
+${op}/                    # operator root, contains this AGENT.md
+├── judge/                # judge wrapper and Python extension
+└── ${op}/                # generated Ascend C project
+    ├── build.sh
+    ├── build_out/
+    ├── .home/            # temporary HOME for .run self-extraction
+    └── .local_opp/       # local custom OPP install target
+\`\`\`
+
+Never install the custom OPP into operator-root \`.local_opp/\`. Use only \`${op}/.local_opp/\` under the generated project.
 
 ## Scope
 
@@ -241,13 +267,60 @@ You are developing only the \`${op}\` operator. In a worktree, your working dire
 6. Only optimize after correctness passes. Use profiling data before changing performance-sensitive code.
 7. Commit changes on the current \`dev/${op}\` branch when the operator reaches a meaningful checkpoint.
 
+## Local Build, Install, And Judge Commands
+
+Run from the operator root after \`cd ${op}\`. Device 3 is hard-coded for this workspace.
+
+Build the generated Ascend C project:
+
+\`\`\`bash
+cd ${op}
+ASCEND_RT_VISIBLE_DEVICES=3 bash build.sh
+cd ..
+\`\`\`
+
+Install the generated custom OPP locally under the generated project:
+
+\`\`\`bash
+cd ${op}/build_out
+HOME=../.home \\
+ASCEND_RT_VISIBLE_DEVICES=3 \\
+./custom_opp_openEuler_aarch64.run --quiet \\
+--install-path=../.local_opp
+cd ../..
+\`\`\`
+
+Install the judge wheel into \`judge/.python_ops/\` and run with \`PYTHONPATH\`:
+
+\`\`\`bash
+cd judge
+source ../${op}/.local_opp/vendors/customize/bin/set_env.bash
+python3 -m pip install --target "\$PWD/.python_ops" --force-reinstall dist/*.whl
+ASCEND_RT_VISIBLE_DEVICES=3 \\
+PYTHONPATH="\$PWD/.python_ops:\$PYTHONPATH" \\
+msprof --application="python3 test_op.py 1"
+cd ..
+\`\`\`
+
+Later test runs do not need to rebuild or reinstall:
+
+\`\`\`bash
+cd judge
+source ../${op}/.local_opp/vendors/customize/bin/set_env.bash
+ASCEND_RT_VISIBLE_DEVICES=3 \\
+PYTHONPATH="\$PWD/.python_ops:\$PYTHONPATH" \\
+msprof --application="python3 test_op.py 1"
+cd ..
+\`\`\`
+
 ## Guardrails
 
 - Keep changes scoped to this operator directory.
 - Do not edit files under \`\$ASC_DEVKIT_HOME\` or \`\$AGENT_SKILLS_HOME\`.
 - Do not remove judge files.
+- Do not change judge interface specifications. You may only add or enrich judge test cases when requested.
 - Do not commit build artifacts, profiling dumps, or local install outputs.
-- \`.local_opp/\` may appear after local install or testing; it is generated state and should remain ignored.
+- Generated local state such as \`${op}/.home/\`, \`${op}/.local_opp/\`, and \`judge/.python_ops/\` should remain ignored.
 EOF
 }
 
