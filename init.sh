@@ -181,6 +181,76 @@ TODO
 EOF
 }
 
+write_operator_agent() {
+    local op="$1"
+    local dst="$2"
+
+    if [[ -f "${dst}/AGENT.md" ]]; then
+        return
+    fi
+
+    cat > "${dst}/AGENT.md" <<EOF
+# ${op} Development Agent
+
+You are developing only the \`${op}\` operator. In a worktree, your working directory is usually \`worktrees/${op}/${op}/\`. Do not modify other operators unless the user explicitly asks.
+
+## Scope
+
+- Primary operator directory: \`${op}/\`
+- Generated project: \`${op}/${op}/\`
+- Specification: \`docs/TASK.md\`
+- Interface JSON: \`${op}.json\`
+- Judge files: \`judge/\`
+- Packaging script: \`pack.sh\`
+
+## Required First Steps
+
+1. Read this file.
+2. Read \`docs/TASK.md\`.
+3. Read \`judge/test_op.py\`, \`judge/extension/custom_op.cpp\`, and \`judge/run.sh\`.
+4. Read \`${op}.json\`.
+5. Inspect the generated host and kernel stubs under \`${op}/${op}/op_host/\` and \`${op}/${op}/op_kernel/\`.
+
+## Skill And Documentation Rules
+
+- Use \`agent-skills-local\` before planning or coding when workflow, implementation, testing, profiling, or optimization choices are involved.
+- Discover local skills from \`\$AGENT_SKILLS_HOME\`; do not hard-code the path.
+- Use \`asc-devkit-local\` before assuming any Ascend C API signature, dtype support, alignment rule, queue behavior, pipeline behavior, or performance restriction.
+- Read Ascend documentation from \`\$ASC_DEVKIT_HOME\` when API details are uncertain.
+- Use available \`@ops-registry-invoke\` / CANNBot skills when they match the task, especially for API best practices, tiling, precision debugging, runtime debugging, profiling, and UT/ST expansion.
+- Do not guess Ascend C APIs. Verify against installed CANN headers, generated code, local docs, or examples first.
+
+## Source Of Truth
+
+- \`judge/\` is the executable compatibility target.
+- If \`docs/TASK.md\` or \`${op}.json\` conflicts with \`judge/\`, follow \`judge/\`, then update the docs and JSON to match.
+- Keep the operator name exactly \`${op}\`; do not rename it to a custom suffix.
+
+## Development Workflow
+
+1. Make \`docs/TASK.md\` and \`${op}.json\` consistent with the judge interface.
+2. Ensure \`${op}/${op}/\` exists. If it is missing, run:
+
+   \`\`\`bash
+   msopgen gen -i ${op}.json -f tf -c ai_core-ascend910b -lan cpp -out ${op}
+   \`\`\`
+
+3. Implement host tiling and kernel code in the generated project.
+4. Expand judge tests before performance optimization. Cover boundary shapes, dtype variants, deterministic random cases, non-32-aligned cases, and judge-specific edge cases.
+5. Validate correctness with \`judge/run.sh\` or the narrowest available judge command.
+6. Only optimize after correctness passes. Use profiling data before changing performance-sensitive code.
+7. Commit changes on the current \`dev/${op}\` branch when the operator reaches a meaningful checkpoint.
+
+## Guardrails
+
+- Keep changes scoped to this operator directory.
+- Do not edit files under \`\$ASC_DEVKIT_HOME\` or \`\$AGENT_SKILLS_HOME\`.
+- Do not remove judge files.
+- Do not commit build artifacts, profiling dumps, or local install outputs.
+- \`.local_opp/\` may appear after local install or testing; it is generated state and should remain ignored.
+EOF
+}
+
 write_json_stub() {
     local op="$1"
     local dst="$2"
@@ -234,6 +304,7 @@ for judge_dir in "${CASE_DIR}"/*; do
     copy_judge_files "${judge_dir}" "${op_dir}"
     write_pack_script "${op_dir}"
     write_gitignore "${op_dir}"
+    write_operator_agent "${op}" "${op_dir}"
     write_task_stub "${op}" "${op_dir}"
     write_json_stub "${op}" "${op_dir}"
     echo "[init] Prepared repo/${op}"

@@ -8,9 +8,10 @@
 
 ```sh
 git clone https://github.com/hbswcsyzx/ascend-sx.git
+cd ascend-sx
 rm -rf .git
-codex exec "read AGENT.md and finish it"
-# claude -p "read AGENT.md and finish it"
+rm -rf README.md
+codex "read AGENT.md and initialize structure"
 ```
 
 ## 效果
@@ -68,11 +69,30 @@ codex exec "read AGENT.md and finish it"
 ```
 
 ```sh
-$ git branch -a
+$ git -C ./repo branch -a
 + dev/Concat
 + dev/Greater
 + dev/IndexAdd
 + dev/SquareSumV1
 + dev/Transpose
 * main
+```
+
+## 后续
+
+```sh
+for wt in ./worktrees/*; do
+    [[ -d "$wt" ]] || continue
+    wt_abs="$(realpath "$wt")"
+    op="$(basename "$wt")"
+    prompt="read ${op}/AGENT.md and develop the ${op} operator"
+
+    tmux new-session -d -s "$op" \
+        codex \
+        --cd "$wt_abs" \
+        -c "projects.\"${wt_abs}\".trust_level=\"trusted\"" \
+        --sandbox danger-full-access \
+        --ask-for-approval never \
+        "$prompt"
+done
 ```

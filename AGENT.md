@@ -48,6 +48,7 @@ Each operator directory initially contains:
 
 ```text
 repo/<OpName>/
+├── AGENT.md
 ├── <OpName>.json
 ├── docs/
 │   └── TASK.md
@@ -66,6 +67,8 @@ repo/<OpName>/
 
 If `init.sh` fails, fix only workspace-local inputs such as missing URLs or malformed archives. Do not rename operator directories.
 
+`repo/<OpName>/AGENT.md` is the per-operator development guide used by future agents in `worktrees/<OpName>/<OpName>/`. It must exist before the initial git commit. Keep it short and operator-scoped.
+
 ## Source Of Truth
 
 Use the task document and judge files to fill each operator specification:
@@ -78,6 +81,12 @@ Use the task document and judge files to fill each operator specification:
 ## Complete Each Operator In `repo/`
 
 For every operator directory discovered from `tmp/case_910b/`, work under `repo/<OpName>/`.
+
+### 0. Verify `AGENT.md`
+
+Open `repo/<OpName>/AGENT.md`. It should describe the current operator scope, required first reads, skill usage rules, source-of-truth rules, development workflow, and guardrails.
+
+Keep it generic enough to work in the later worktree checkout, where the path is usually `worktrees/<OpName>/<OpName>/`. It should mention `AGENT_SKILLS_HOME`, `ASC_DEVKIT_HOME`, `agent-skills-local`, `asc-devkit-local`, and matching `@ops-registry-invoke` / CANNBot skills. Do not hard-code absolute local paths.
 
 ### 1. Complete `docs/TASK.md`
 
@@ -238,12 +247,14 @@ Before stopping, verify:
 - Top-level `tmp/` exists and contains `case_910b/` plus the XLSX.
 - `repo/` is a git repository on branch `main`.
 - `repo/` contains all initialized operators.
+- Every operator has `repo/<OpName>/AGENT.md`.
 - Every operator has a completed English `docs/TASK.md`.
 - Every operator JSON still has the original `"op": "<OpName>"` field.
 - Every operator has generated source under `repo/<OpName>/<OpName>/`.
 - `git -C repo log --oneline -1` shows the `init` commit.
 - `git -C repo branch -a` shows `main` plus `dev/<OpName>` branches.
 - `worktrees/<OpName>/` exists for every operator.
+- In each worktree, `worktrees/<OpName>/<OpName>/AGENT.md` exists for the future operator-development agent.
 - Top-level `tmp/` was not moved under `repo/`.
 
 After this checklist passes, the initialization task is complete.
