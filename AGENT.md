@@ -130,7 +130,7 @@ Critical rules:
 - Use TensorFlow framework generation, so choose JSON fields compatible with:
 
 ```bash
-msopgen gen -i <OpName>.json -f tf -c ai_core-ascend910b -lan cpp -out <OpName>
+msopgen gen -i <OpName>.json -f tf -c ai_core-ascend910b3 -lan cpp -out <OpName>
 ```
 
 Use these conversion rules when filling JSON from the XLSX:
@@ -160,7 +160,7 @@ From the operator directory under `repo/`, run exactly:
 
 ```bash
 cd repo/<OpName>
-msopgen gen -i <OpName>.json -f tf -c ai_core-ascend910b -lan cpp -out <OpName>
+msopgen gen -i <OpName>.json -f tf -c ai_core-ascend910b3 -lan cpp -out <OpName>
 cd ../..
 ```
 

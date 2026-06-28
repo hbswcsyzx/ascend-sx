@@ -170,7 +170,7 @@ TODO
 ## 3. Development Workflow
 
 1. Complete \`${op}.json\` from the task document without changing the existing \`op\` field.
-2. Run \`msopgen gen -i ${op}.json -f tf -c ai_core-ascend910b -lan cpp -out ${op}\` from this directory.
+2. Run \`msopgen gen -i ${op}.json -f tf -c ai_core-ascend910b3 -lan cpp -out ${op}\` from this directory.
 3. Expand \`judge/test_op.py\` with deterministic correctness cases before optimizing performance.
 4. Implement and optimize the Ascend C operator. Use profiling data before making performance changes.
 
@@ -232,7 +232,7 @@ You are developing only the \`${op}\` operator. In a worktree, your working dire
 2. Ensure \`${op}/${op}/\` exists. If it is missing, run:
 
    \`\`\`bash
-   msopgen gen -i ${op}.json -f tf -c ai_core-ascend910b -lan cpp -out ${op}
+   msopgen gen -i ${op}.json -f tf -c ai_core-ascend910b3 -lan cpp -out ${op}
    \`\`\`
 
 3. Implement host tiling and kernel code in the generated project.
