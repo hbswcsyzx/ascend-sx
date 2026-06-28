@@ -86,6 +86,13 @@ $ git -C ./repo branch -a
 ## 后续
 
 ```sh
+cd ./worktrees/Concat
+codex "read Concat/AGENT.md and develop the Concat operator"
+```
+
+或者并行开发所有算子
+
+```sh
 for wt in ./worktrees/*; do
     [[ -d "$wt" ]] || continue
     wt_abs="$(realpath "$wt")"
